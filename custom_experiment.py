@@ -39,8 +39,6 @@ Note that evaluation results (on the CartPole-v1 env) should be close to perfect
 (episode return of ~500.0) as we are acting greedily inside the evaluation procedure.
 """
 
-from typing import Dict
-
 import numpy as np
 from ray import tune
 from ray.rllib.algorithms.ppo import PPOConfig
@@ -50,7 +48,7 @@ from ray.rllib.utils.metrics import NUM_ENV_STEPS_SAMPLED_LIFETIME
 torch, _ = try_import_torch()
 
 
-def my_experiment(config: Dict):
+def my_experiment(config: dict):
     # Extract the number of iterations to run from the config.
     train_iterations = config.pop("train-iterations", 2)
     eval_episodes_to_do = config.pop("eval-episodes", 1)
@@ -119,9 +117,11 @@ def my_experiment(config: Dict):
     while num_episodes < eval_episodes_to_do:
         # Call the RLModule's `forward_inference()` method to compute an
         # action.
-        rl_module_out = rl_module.forward_inference({
-            "obs": torch.from_numpy(np.expand_dims(obs, 0)),  # <- add B=1
-        })
+        rl_module_out = rl_module.forward_inference(
+            {
+                "obs": torch.from_numpy(np.expand_dims(obs, 0)),  # <- add B=1
+            }
+        )
         action_logits = rl_module_out["action_dist_inputs"][0]  # <- remove B=1
         action = np.argmax(action_logits.detach().cpu().numpy())  # act greedily
 
