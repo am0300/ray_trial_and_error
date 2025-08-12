@@ -53,7 +53,6 @@ of pretraining:
 from pathlib import Path
 
 import gymnasium as gym
-
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.algorithms.ppo.ppo_catalog import PPOCatalog
 from ray.rllib.algorithms.ppo.torch.ppo_torch_rl_module import PPOTorchRLModule
@@ -101,7 +100,7 @@ if __name__ == "__main__":
         raise ValueError(
             "This pre-training example script requires at least 1 agent. "
             "Try setting the command line argument `--num-agents` to the "
-            "number of agents you want to use."
+            "number of agents you want to use.",
         )
 
     # Store the user's stopping criteria for the later training run.
