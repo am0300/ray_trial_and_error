@@ -33,21 +33,19 @@ be played by the user against the "main" agent on the command line.
 import functools
 
 import numpy as np
-import torch
-
 import ray
-from ray.tune.result import TRAINING_ITERATION
+import torch
 from ray.rllib.core.rl_module.default_model_config import DefaultModelConfig
 from ray.rllib.core.rl_module.multi_rl_module import MultiRLModuleSpec
 from ray.rllib.core.rl_module.rl_module import RLModuleSpec
-from ray.rllib.env.utils import try_import_pyspiel, try_import_open_spiel
+from ray.rllib.env.utils import try_import_open_spiel, try_import_pyspiel
 from ray.rllib.env.wrappers.open_spiel import OpenSpielEnv
+from ray.rllib.examples._old_api_stack.policy.random_policy import RandomPolicy
 from ray.rllib.examples.multi_agent.utils import (
-    ask_user_for_action,
     SelfPlayLeagueBasedCallback,
     SelfPlayLeagueBasedCallbackOldAPIStack,
+    ask_user_for_action,
 )
-from ray.rllib.examples._old_api_stack.policy.random_policy import RandomPolicy
 from ray.rllib.examples.rl_modules.classes.random_rlm import RandomRLModule
 from ray.rllib.policy.policy import PolicySpec
 from ray.rllib.utils.metrics import NUM_ENV_STEPS_SAMPLED_LIFETIME
@@ -56,13 +54,13 @@ from ray.rllib.utils.test_utils import (
     run_rllib_example_script_experiment,
 )
 from ray.tune.registry import get_trainable_cls, register_env
+from ray.tune.result import TRAINING_ITERATION
 
 open_spiel = try_import_open_spiel(error=True)
 pyspiel = try_import_pyspiel(error=True)
 
 # Import after try_import_open_spiel, so we can error out with hints
 from open_spiel.python.rl_environment import Environment  # noqa: E402
-
 
 parser = add_rllib_example_script_args(default_timesteps=2000000)
 parser.set_defaults(
@@ -158,7 +156,7 @@ if __name__ == "__main__":
                         RandomPolicy
                         if mid in ["main_exploiter_0", "league_exploiter_0"]
                         else None
-                    )
+                    ),
                 )
                 for mid in names
             }
@@ -178,7 +176,7 @@ if __name__ == "__main__":
                 if args.enable_new_api_stack
                 else SelfPlayLeagueBasedCallbackOldAPIStack,
                 win_rate_threshold=args.win_rate_threshold,
-            )
+            ),
         )
         .env_runners(
             num_envs_per_env_runner=1 if args.enable_new_api_stack else 5,
@@ -202,7 +200,7 @@ if __name__ == "__main__":
         )
         .rl_module(
             rl_module_spec=MultiRLModuleSpec(
-                rl_module_specs=_get_multi_agent()["spec"]
+                rl_module_specs=_get_multi_agent()["spec"],
             ),
         )
     )
@@ -217,7 +215,10 @@ if __name__ == "__main__":
             "league_size": args.min_league_size,
         }
         results = run_rllib_example_script_experiment(
-            config, args, stop=stop, keep_ray_up=True
+            config,
+            args,
+            stop=stop,
+            keep_ray_up=True,
         )
 
     # Restore trained Algorithm (set to non-explore behavior) and play against
@@ -254,9 +255,11 @@ if __name__ == "__main__":
                     obs = np.array(time_step.observations["info_state"][player_id])
                     if args.enable_new_api_stack:
                         action = np.argmax(
-                            rl_module.forward_inference({
-                                "obs": torch.from_numpy(obs).unsqueeze(0).float()
-                            })["action_dist_inputs"][0].numpy()
+                            rl_module.forward_inference(
+                                {
+                                    "obs": torch.from_numpy(obs).unsqueeze(0).float(),
+                                }
+                            )["action_dist_inputs"][0].numpy(),
                         )
                     else:
                         action = algo.compute_single_action(obs, policy_id="main")
