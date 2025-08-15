@@ -5,8 +5,8 @@ from typing import *
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from kodoku.trainer import KODOKUTrainer
-from sample.battle_field_env import SimpleBattlefieldEnv_Asym
+from sample.battle_field_env import SimpleBattlefieldEnv
+from sample.kodoku.trainer import KODOKUTrainer
 
 
 def config_fn():
@@ -38,8 +38,8 @@ def callback(trainer: KODOKUTrainer, epoch: int, result: Dict):
 if __name__ == "__main__":
     trainer = KODOKUTrainer(
         log_dir="./log_dir",
-        env_class=SimpleBattlefieldEnv_Asym,
-        train_config=json.load(open("train_config.json")),
+        env_class=SimpleBattlefieldEnv,
+        train_config=json.load(open("./sample/train_config.json")),
         env_config_fn=config_fn,
     )
 

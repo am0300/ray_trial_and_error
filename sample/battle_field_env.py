@@ -6,16 +6,17 @@ from typing import Any
 import cv2
 import numpy as np
 from gymnasium import spaces
-from ray.rllib.env import MultiAgentEnv
 from ray.rllib.env.env_context import EnvContext
 from ray.rllib.evaluation.episode_v2 import EpisodeV2
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from kodoku.env import MultiEnvWrapper
+from sample.kodoku.env import MultiEnvWrapper
 
+# renderで使う色
 BLACK = (0, 0, 0)
 BLUE = (255, 0, 0)
 RED = (0, 0, 255)
+RENDER_FPS = 1
 
 
 class SimpleBattlefieldUnit:
@@ -23,13 +24,13 @@ class SimpleBattlefieldUnit:
 
     def __init__(
         self,
-        pos: np.ndarray,
-        hp: float,
-        power: float,
-        range: float,
-        speed: float,
-        name: str,
-    ):
+        pos: np.ndarray,  # 座標
+        hp: float,  # 体力
+        power: float,  # 攻撃力
+        range: float,  # 射程
+        speed: float,  # 移動速度
+        name: str,  # 名前
+    ) -> None:
         """Unitの初期化処理."""
         self.pos = pos
         self.hp = hp
@@ -80,17 +81,19 @@ class SimpleBattlefieldSimulator:
         def_unit_speed: float,
         timelimit: int,
         **kwargs,
-    ):
-        self.depth = depth
-        self.width = width
-        self.timelimit = timelimit
+    ) -> None:
+        """シミュレーションの初期化."""
+        self.depth = depth  # 戦場の奥行
+        self.width = width  # 戦場の幅
+        self.timelimit = timelimit  # 戦闘時間
 
+        rng = np.random.default_rng()
         self.atk_units = [
             SimpleBattlefieldUnit(
                 np.array(
                     [
-                        np.random.uniform(atk_spawn_line, depth),
-                        np.random.uniform(0, width),
+                        rng.uniform(atk_spawn_line, depth),
+                        rng.uniform(0, width),
                     ],
                 ),
                 atk_unit_hp,
@@ -105,7 +108,7 @@ class SimpleBattlefieldSimulator:
         self.def_units = [
             SimpleBattlefieldUnit(
                 np.array(
-                    [np.random.uniform(0, def_spawn_line), np.random.uniform(0, width)],
+                    [rng.uniform(0, def_spawn_line), rng.uniform(0, width)],
                 ),
                 def_unit_hp,
                 def_unit_power,
@@ -118,7 +121,8 @@ class SimpleBattlefieldSimulator:
 
         self.elapsed = 0
 
-    def step(self):
+    def step(self) -> dict[str, Any]:
+        """シミュレーションを1step進める."""
         self.elapsed += 1
 
         # calc zoc
@@ -203,14 +207,16 @@ class SimpleBattlefieldSimulator:
         return events
 
 
-class SimpleBattlefieldSimulator_Defensive(SimpleBattlefieldSimulator):
-    """防衛シナリオ用拡張."""
+class ExtendedSimulator(SimpleBattlefieldSimulator):
+    """防衛シナリオ用拡張シミュレータ."""
 
-    def __init__(self, def_line: float, **kwargs):
+    def __init__(self, def_line: float, **kwargs) -> None:
+        """シミュレーションの初期化."""
         super().__init__(**kwargs)
         self.def_line = def_line
 
-    def step(self):
+    def step(self) -> dict[str, Any]:
+        """シミュレーションを1step進める."""
         events = super().step()
 
         atk_pos = np.array([unit.pos for unit in self.atk_units])
@@ -234,198 +240,97 @@ class SimpleBattlefieldSimulator_Defensive(SimpleBattlefieldSimulator):
         return events
 
 
-class SimpleBattlefieldEnv_Sym(MultiEnvWrapper):
-    """対称型RL環境."""
+class SimpleBattlefieldEnv(MultiEnvWrapper):
+    """非対称型RL環境."""
 
-    def __init__(self, config: EnvContext):
-        super().__init__(config)
+    def __init__(self, config: EnvContext) -> None:
+        """環境の初期化."""
+        super().__init__()
+        self.config_fn = config["fn"]
+
+        self.sim: ExtendedSimulator | None = None
+        self.scenario_name = None
+        self.config = None
+
         self.viewer = None
+        self.possible_agents = ["atk0", "atk1", "atk2", "atk3", "def0", "def1", "def2"]
+        self.agents = self.possible_agents
+        space_dict = self.get_spaces()
+        self.observation_spaces = {}
+        self.action_spaces = {}
+        for agent_id in self.possible_agents:
+            policy_id = agent_id[:-1]
+            self.observation_spaces[agent_id] = space_dict[policy_id][0]
+            self.action_spaces[agent_id] = space_dict[policy_id][1]
 
-    def log(self) -> dict:
-        return {"events": self.events}
+    def initialize_simulator(self, config: dict) -> ExtendedSimulator:
+        """シミュレータを初期化する."""
+        self.events = {}  # シミュレーションのstepで発生したeventの辞書
+        return ExtendedSimulator(**config)
 
-    def initialize_env(self, config: dict) -> Any:
-        self.events = {}
-        return SimpleBattlefieldSimulator(**config)
-
-    def get_spaces(self) -> dict[str, tuple[spaces.Space, spaces.Space]]:
-        if self.env is None:
-            self.env = self.initialize_env(self.config_fn()[1])
-            print("Initialized dummy env to compute spaces.")
-
-        obs_space = spaces.Box(
-            low=0,
-            high=1,
-            shape=(3 * (len(self.env.atk_units) + len(self.env.def_units)),),
-            dtype=np.float32,
-        )
-        act_space = spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float32)
-
-        space_dict = {
-            "common": (obs_space, act_space),
-        }
-
-        return space_dict
-
-    def get_policy_mapping_fn(self) -> Callable[[str, EpisodeV2], str]:
-        if self.env is None:
-            self.env = self.initialize_env(self.config_fn()[1])
-            print("Initialized dummy env to compute spaces.")
-
-        def policy_mapping_fn(agent_id, episode, **kwargs):
-            return "common"
-
-        return policy_mapping_fn
-
-    def reset_impl(self) -> dict[str, Any]:
-        return self.get_obs()
-
-    def get_obs(self) -> dict[str, Any]:
-        def append_obs(obs, unit):
-            obs.append(unit.pos[0] / self.env.depth)
-            obs.append(unit.pos[1] / self.env.width)
-            obs.append(unit.hp / unit.max_hp)
-            return obs
-
-        def make_obs(blue_agents, red_agents):
-            obs_dict = {}
-            for ai, agent in enumerate(blue_agents):
-                if agent.hp <= 0:
-                    continue
-
-                obs = []
-                for i in range(len(blue_agents)):
-                    unit = blue_agents[(ai + i) % len(blue_agents)]
-                    obs = append_obs(obs, unit)
-
-                for i in range(len(red_agents)):
-                    unit = red_agents[i]
-                    obs = append_obs(obs, unit)
-
-                obs_dict[str(agent)] = np.array(obs)
-            return obs_dict
-
-        return {
-            **make_obs(self.env.atk_units, self.env.def_units),
-            **make_obs(self.env.def_units, self.env.atk_units),
-        }
-
-    def calc_reward(
-        self,
-        rewards,
-        dones,
-        unit_list,
-        scale,
-        kill_reward_scale=0.1,
-        extinct_reward=1,
-        timelimit_reward=0.0,
-        timeelapse_reward=0.5,
-    ):
-        for unit in unit_list:
-            rewards[str(unit)] -= kill_reward_scale * self.events["ATK_KILLED"] * scale
-            rewards[str(unit)] += kill_reward_scale * self.events["DEF_KILLED"] * scale
-            rewards[str(unit)] -= timeelapse_reward * self.events["TIME_ELAPSE"] * scale
-
-            if "ATK_EXTINCT" in self.events:
-                rewards[str(unit)] -= extinct_reward * scale
-                dones["__all__"] = True
-            if "DEF_EXTINCT" in self.events:
-                rewards[str(unit)] += extinct_reward * scale
-                dones["__all__"] = True
-            if "TIMELIMIT" in self.events:
-                rewards[str(unit)] -= timelimit_reward * scale
-                dones["__all__"] = True
-
-            if unit.hp <= 0:
-                dones[str(unit)] = True
-        return rewards, dones
+    def reset(self, *, seed, options) -> dict[str, Any]:
+        """Reset."""
+        self.scenario_name, self.config = self.config_fn()
+        self.sim = self.initialize_simulator(self.config)
+        obs = self.get_obs()
+        self.agents = list(obs.keys())
+        return obs, {}
 
     def step(
         self,
-        action: dict[str, Any],
+        action_dict: dict[str, Any],
     ) -> tuple[dict[str, Any], dict[str, float], dict[str, bool], dict]:
-        for unit in self.env.atk_units + self.env.def_units:
-            if str(unit) in action:
-                unit.accel = action[str(unit)]
+        """Update the environment's state based on the action dict."""
+        for unit in self.sim.atk_units + self.sim.def_units:
+            if unit.name in action_dict:
+                unit.accel = action_dict[unit.name]
 
-        self.events = self.env.step()
+        self.events = self.sim.step()
 
-        rewards = {str(unit): 0 for unit in self.env.atk_units + self.env.def_units}
+        rewards = {unit.name: 0 for unit in self.sim.atk_units + self.sim.def_units}
         terminated = {
-            str(unit): False for unit in self.env.atk_units + self.env.def_units
+            unit.name: False for unit in self.sim.atk_units + self.sim.def_units
         }
         truncated = {
-            str(unit): False for unit in self.env.atk_units + self.env.def_units
+            unit.name: False for unit in self.sim.atk_units + self.sim.def_units
         }
         terminated["__all__"] = False
         truncated["__all__"] = False
 
-        rewards, dones = self.calc_reward(
+        rewards, terminated, truncated = self.calc_reward(
             rewards,
             terminated,
             truncated,
-            self.env.atk_units,
+            self.sim.atk_units,
             1.0,
         )
-        rewards, dones = self.calc_reward(
+        rewards, terminated, truncated = self.calc_reward(
             rewards,
             terminated,
             truncated,
-            self.env.def_units,
+            self.sim.def_units,
             -1.0,
         )
+        obs = self.get_obs()
+        self.agents = list(obs.keys())
 
-        return self.get_obs(), rewards, dones, {}
+        self.render()
+        return obs, rewards, terminated, truncated, {}
 
-    def render(self, mode: str = "human"):
-        if mode == "human":
-            img_scale = 256
-            height = int(self.env.width * img_scale)
-            width = int(self.env.depth * img_scale)
-
-            img = np.ones((height, width, 3), np.uint8) * 255
-            for unit in self.env.atk_units:
-                if unit.hp > 0:
-                    img = cv2.circle(
-                        img,
-                        (int(unit.pos[0] * img_scale), int(unit.pos[1] * img_scale)),
-                        int(unit.range * img_scale),
-                        (int(255 * unit.hp / unit.max_hp), 0, 0),
-                        1,
-                    )
-            for unit in self.env.def_units:
-                if unit.hp > 0:
-                    img = cv2.circle(
-                        img,
-                        (int(unit.pos[0] * img_scale), int(unit.pos[1] * img_scale)),
-                        int(unit.range * img_scale),
-                        (0, 0, int(255 * unit.hp / unit.max_hp)),
-                        1,
-                    )
-
-            cv2.imshow("", img)
-            cv2.waitKey(1)
-
-        else:
-            raise NotImplementedError
-
-
-class SimpleBattlefieldEnv_Asym(MultiAgentEnv):
-    """非対称型RL環境."""
-
-    def initialize_env(self, config: dict) -> Any:
-        self.events = {}
-        return SimpleBattlefieldSimulator_Defensive(**config)
+    def log(self) -> dict:
+        """Log."""
+        return {"events": self.events}
 
     def get_spaces(self) -> dict[str, tuple[spaces.Space, spaces.Space]]:
-        if self.env is None:
-            self.env = self.initialize_env(self.config_fn()[1])
+        """環境の空間情報を取得する."""
+        if self.sim is None:
+            self.sim = self.initialize_simulator(self.config_fn()[1])
             print("Initialized dummy env to compute spaces.")
 
         obs_space = spaces.Box(
             low=0,
             high=1,
-            shape=(3 * (len(self.env.atk_units) + len(self.env.def_units)),),
+            shape=(3 * (len(self.sim.atk_units) + len(self.sim.def_units)),),
             dtype=np.float32,
         )
         act_space = spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float32)
@@ -438,15 +343,15 @@ class SimpleBattlefieldEnv_Asym(MultiAgentEnv):
         return space_dict
 
     def get_policy_mapping_fn(self) -> Callable[[str, EpisodeV2], str]:
-        if self.env is None:
-            self.env = self.initialize_env(self.config_fn()[1])
+        if self.sim is None:
+            self.sim = self.initialize_simulator(self.config_fn()[1])
             print("Initialized dummy env to compute spaces.")
 
         def policy_mapping_fn(
             agent_id,
             episode,
-            atk_units=[str(unit) for unit in self.env.atk_units],
-            def_units=[str(unit) for unit in self.env.def_units],
+            atk_units=[unit.name for unit in self.sim.atk_units],
+            def_units=[unit.name for unit in self.sim.def_units],
             **kwargs,
         ):
             if agent_id in atk_units:
@@ -457,6 +362,35 @@ class SimpleBattlefieldEnv_Asym(MultiAgentEnv):
             raise NotImplementedError
 
         return policy_mapping_fn
+
+    def get_obs(self) -> dict[str, Any]:
+        def append_obs(obs, unit):
+            obs.append(unit.pos[0] / self.sim.depth)
+            obs.append(unit.pos[1] / self.sim.width)
+            obs.append(unit.hp / unit.max_hp)
+            return obs
+
+        def make_obs(blue_agents, red_agents):
+            obs_dict = {}
+            for ai_idx, agent in enumerate(blue_agents):
+                if agent.hp <= 0:
+                    continue
+
+                obs = []
+                for i in range(len(blue_agents)):
+                    unit = blue_agents[(ai_idx + i) % len(blue_agents)]
+                    obs = append_obs(obs, unit)
+
+                for i in range(len(red_agents)):
+                    unit = red_agents[i]
+                    obs = append_obs(obs, unit)
+
+                obs_dict[agent.name] = np.array(obs)
+            return obs_dict
+
+        atk_obs = make_obs(self.sim.atk_units, self.sim.def_units)
+        def_obs = make_obs(self.sim.def_units, self.sim.atk_units)
+        return atk_obs | def_obs
 
     def calc_reward(
         self,
@@ -472,40 +406,46 @@ class SimpleBattlefieldEnv_Asym(MultiAgentEnv):
         timelimit_reward=0.0,
         timeelapse_reward=0.5,
     ):
+        """報酬を計算する."""
         for unit in unit_list:
-            rewards[str(unit)] -= kill_reward_scale * self.events["ATK_KILLED"] * scale
-            rewards[str(unit)] += kill_reward_scale * self.events["DEF_KILLED"] * scale
-            rewards[str(unit)] += (
-                approach_reward_scale * self.events["ATK_APPROACH"] * scale
-            )
-            rewards[str(unit)] -= timeelapse_reward * self.events["TIME_ELAPSE"] * scale
+            if self.events.get("ATK_KILLED"):
+                rewards[unit.name] -= (
+                    kill_reward_scale * self.events["ATK_KILLED"] * scale
+                )
+            if self.events.get("DEF_KILLED"):
+                rewards[unit.name] += (
+                    kill_reward_scale * self.events["DEF_KILLED"] * scale
+                )
+            if self.events.get("ATK_APPROACH"):
+                rewards[unit.name] += (
+                    approach_reward_scale * self.events["ATK_APPROACH"] * scale
+                )
+
+            rewards[unit.name] -= timeelapse_reward * self.events["TIME_ELAPSE"] * scale
 
             if "ATK_BREACH" in self.events:
-                rewards[str(unit)] += breach_reward * scale
+                rewards[unit.name] += breach_reward * scale
                 terminated["__all__"] = True
             if "ATK_EXTINCT" in self.events:
-                rewards[str(unit)] -= extinct_reward * scale
+                rewards[unit.name] -= extinct_reward * scale
                 terminated["__all__"] = True
             if "TIMELIMIT" in self.events:
-                rewards[str(unit)] -= timelimit_reward * scale
+                rewards[unit.name] -= timelimit_reward * scale
                 truncated["__all__"] = True
 
             if unit.hp <= 0:
-                terminated[str(unit)] = True
+                terminated[unit.name] = True
         return rewards, terminated, truncated
 
     def render(self, mode: str = "human") -> None:
-        """opencvを使ってシミュレーションを可視化する.
-
-        frame
-        """
+        """opencvを使ってシミュレーションを可視化する."""
         if mode == "human":
             img_scale = 256
             field_delta = 10  # 余白のサイズ(delta + img_scale + delta)
-            frame_width = int(self.env.depth * img_scale + field_delta * 2)
-            frame_height = int(self.env.width * img_scale + field_delta * 2)
-            field_height = int(self.env.width * img_scale)
-            field_width = int(self.env.depth * img_scale)
+            frame_width = int(self.sim.depth * img_scale + field_delta * 2)
+            frame_height = int(self.sim.width * img_scale + field_delta * 2)
+            field_height = int(self.sim.width * img_scale)
+            field_width = int(self.sim.depth * img_scale)
 
             img = np.ones((frame_height, frame_width, 3), np.uint8) * 255
             img = cv2.rectangle(
@@ -520,12 +460,12 @@ class SimpleBattlefieldEnv_Asym(MultiAgentEnv):
             )
             img = cv2.line(
                 img,
-                (int((self.env.def_line) * img_scale + field_delta), field_delta),
-                (int((self.env.def_line) * img_scale + field_delta), field_height),
+                (int((self.sim.def_line) * img_scale + field_delta), field_delta),
+                (int((self.sim.def_line) * img_scale + field_delta), field_height),
                 BLUE,
                 2,
             )
-            for unit in self.env.atk_units:
+            for unit in self.sim.atk_units:
                 img = cv2.circle(
                     img,
                     (int(unit.pos[0] * img_scale), int(unit.pos[1] * img_scale)),
@@ -539,7 +479,7 @@ class SimpleBattlefieldEnv_Asym(MultiAgentEnv):
                     (0, 0, int(255 * unit.hp / unit.max_hp)),
                     markerSize=15,
                 )
-            for unit in self.env.def_units:
+            for unit in self.sim.def_units:
                 img = cv2.circle(
                     img,
                     (int(unit.pos[0] * img_scale), int(unit.pos[1] * img_scale)),
@@ -556,8 +496,8 @@ class SimpleBattlefieldEnv_Asym(MultiAgentEnv):
 
             # OpenCV ウィンドウに表示
             cv2.imshow("SimpleBattleFieldViewer", img)
-            # cv2.waitKey(int(1000 / 30))  # 描画間隔
-            cv2.waitKey(1)
+            # cv2.waitKey(int(1000 / fps))  # 描画間隔
+            cv2.waitKey(RENDER_FPS)
         else:
             raise NotImplementedError
 
@@ -585,7 +525,7 @@ if __name__ == "__main__":
         }
 
     env_config = {"fn": config_fn}
-    env = SimpleBattlefieldEnv_Asym(env_config)
+    env = SimpleBattlefieldEnv(env_config)
 
     for i in range(1):
         obs = env.reset(12345, {})
@@ -594,11 +534,11 @@ if __name__ == "__main__":
             action = {}
             for agent, (obs_space, act_space) in env.get_spaces().items():
                 action[agent] = act_space.sample()
-            obs, rewards, dones, info = env.step(action)
+            obs, rewards, terminated, truncated, info = env.step(action)
             # print(f"action: {action}")
             # print(rewards, dones, info, env.log())
 
             env.render()
 
-            if dones["__all__"]:
+            if terminated["__all__"] or truncated["__all__"]:
                 break

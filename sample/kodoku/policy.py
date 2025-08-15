@@ -5,14 +5,16 @@ import numpy as np
 from ray.rllib.algorithms import Algorithm
 from ray.rllib.evaluation.episode_v2 import EpisodeV2
 from ray.rllib.utils.typing import ResultDict
-
-from kodoku.utils import ScheduleScaler
+from sample.kodoku.utils import ScheduleScaler
 
 
 class PolicyMappingManager(metaclass=ABCMeta):
     @abstractmethod
     def get_policy_mapping(
-        self, agent_id: str, policy_id: str, episode: EpisodeV2
+        self,
+        agent_id: str,
+        policy_id: str,
+        episode: EpisodeV2,
     ) -> str:
         """Subpolicy to policy mapping function
 
@@ -39,7 +41,10 @@ class PolicyMappingManager(metaclass=ABCMeta):
 
     @abstractmethod
     def update_policy_configuration(
-        self, trainer: Algorithm, result: ResultDict, reward_list: List[Dict]
+        self,
+        trainer: Algorithm,
+        result: ResultDict,
+        reward_list: List[Dict],
     ) -> None:
         """Update policy mapping according to training result, if necessary
 
@@ -59,7 +64,10 @@ class DefaultPolicyMappingManager(PolicyMappingManager):
     """Identity policy mapping"""
 
     def get_policy_mapping(
-        self, agent_id: str, policy_id: str, episode: EpisodeV2
+        self,
+        agent_id: str,
+        policy_id: str,
+        episode: EpisodeV2,
     ) -> str:
         return policy_id
 
@@ -67,7 +75,10 @@ class DefaultPolicyMappingManager(PolicyMappingManager):
         return [policy_id]
 
     def update_policy_configuration(
-        self, trainer: Algorithm, result: ResultDict, reward_list: List[Dict]
+        self,
+        trainer: Algorithm,
+        result: ResultDict,
+        reward_list: List[Dict],
     ) -> None:
         return
 
@@ -105,8 +116,9 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
         self.subpolicy_priority_fn = subpolicy_priority_fn
         self.selection = np.dstack(
             np.meshgrid(
-                np.arange(self.num_subpolicies), np.arange(self.num_subpolicies)
-            )
+                np.arange(self.num_subpolicies),
+                np.arange(self.num_subpolicies),
+            ),
         ).reshape(-1, 2)
         self.p = np.ones((self.num_subpolicies, self.num_subpolicies), dtype=np.float32)
         self.p /= np.sum(self.p)
@@ -144,7 +156,10 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
         return policy_id + "_" + str(index)
 
     def get_policy_mapping(
-        self, agent_id: str, policy_id: str, episode: EpisodeV2
+        self,
+        agent_id: str,
+        policy_id: str,
+        episode: EpisodeV2,
     ) -> str:
         """Maps policy to subpolicy
 
@@ -167,7 +182,8 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
         )
         self.episode_agent_mapping[episode.episode_id][agent_id] = force
         return self.subpolicy_name(
-            policy_id, self.episode_policy_mapping[episode.episode_id][force]
+            policy_id,
+            self.episode_policy_mapping[episode.episode_id][force],
         )
 
     def get_policy_mapping_list(self, policy_id: str) -> List[str]:
@@ -183,7 +199,10 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
         return [self.subpolicy_name(policy_id, i) for i in range(self.num_subpolicies)]
 
     def update_policy_configuration(
-        self, trainer: Algorithm, result: ResultDict, reward_list: List[Dict]
+        self,
+        trainer: Algorithm,
+        result: ResultDict,
+        reward_list: List[Dict],
     ) -> None:
         """Update policy configuration
         Calls user-defined configuration function after computing blufor vs redfor subpolicy reward matrix.
@@ -195,7 +214,8 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
 
         """
         cum_rewards, match_matrix, policy_force_mapping = self.compute_match_results(
-            reward_list, ma_length=len(reward_list) // (self.num_subpolicies**2)
+            reward_list,
+            ma_length=len(reward_list) // (self.num_subpolicies**2),
         )
 
         if self.subpolicy_priority_fn is not None and match_matrix is not None:
@@ -218,18 +238,21 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
 
                     if isinstance(policy._lr_schedule, ScheduleScaler):
                         policy._lr_schedule = ScheduleScaler(
-                            policy._lr_schedule.schedule, scale
+                            policy._lr_schedule.schedule,
+                            scale,
                         )
                     else:
                         policy._lr_schedule = ScheduleScaler(policy._lr_schedule, scale)
                 else:
                     print(
                         "Policy %s was not configured by wolf_fn because it was used in both blufor and redfor."
-                        % policy_id
+                        % policy_id,
                     )
 
     def compute_match_results(
-        self, reward_list: List[Dict], ma_length: int = 1000
+        self,
+        reward_list: List[Dict],
+        ma_length: int = 1000,
     ) -> Tuple[Dict[str, List[float]], np.ndarray, Dict[str, List[str]]]:
         """Compute blufor vs redfor subpolicy reward matrix
         Result of this function can be used to determine which subpolicy to utilize, which subpolicy to train more,
@@ -260,7 +283,7 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
                 if force not in cum_reward_list:
                     print(
                         "Unknown force %s in FictitiousSelfPlayManager"
-                        % self.episode_agent_mapping[episode_id][agent_id]
+                        % self.episode_agent_mapping[episode_id][agent_id],
                     )
 
                 cum_reward_list[force].append(reward)
@@ -274,32 +297,35 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
                     [
                         np.mean(cum_reward_list["blufor"]),
                         np.mean(cum_reward_list["redfor"]),
-                    ]
-                )
+                    ],
+                ),
             )
             for force in ["blufor", "redfor"]:
                 cum_reward_list_all[force].append(np.mean(cum_reward_list[force]))
 
         # Compute moving average
         current_match_results = np.zeros(
-            (self.num_subpolicies, self.num_subpolicies, 2), dtype=np.float32
+            (self.num_subpolicies, self.num_subpolicies, 2),
+            dtype=np.float32,
         )
 
         for bi in range(self.num_subpolicies):
             for ri in range(self.num_subpolicies):
                 if len(self.match_results[bi][ri]) == 0:
                     print(
-                        "Match result computation failed due to insufficient samples."
+                        "Match result computation failed due to insufficient samples.",
                     )
                     return cum_reward_list_all, None, policy_force_mapping
 
                 if len(self.match_results[bi][ri]) <= ma_length:
                     current_match_results[bi][ri] = np.mean(
-                        self.match_results[bi][ri], axis=0
+                        self.match_results[bi][ri],
+                        axis=0,
                     )
                 else:
                     current_match_results[bi][ri] = np.mean(
-                        self.match_results[bi][ri][-ma_length:], axis=0
+                        self.match_results[bi][ri][-ma_length:],
+                        axis=0,
                     )
 
         return cum_reward_list_all, current_match_results, policy_force_mapping

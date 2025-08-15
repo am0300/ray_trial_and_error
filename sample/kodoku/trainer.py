@@ -9,11 +9,10 @@ from ray.rllib.policy.policy import Policy, PolicySpec
 from ray.rllib.policy.sample_batch import DEFAULT_POLICY_ID
 from ray.rllib.utils.typing import ResultDict
 from ray.tune.logger import pretty_print
+from sample.kodoku.env import EnvWrapper
+from sample.kodoku.policy import *
+from sample.kodoku.utils import LogCallbacks
 from torch.utils.tensorboard import SummaryWriter
-
-from kodoku.env import EnvWrapper
-from kodoku.policy import *
-from kodoku.utils import LogCallbacks, print_network_architecture
 
 
 class KODOKUTrainer:
@@ -42,6 +41,7 @@ class KODOKUTrainer:
         ray.init(**ray_config)
         assert ray.is_initialized() == True
 
+        # Tensorboard configuration
         self.summaryWriter = SummaryWriter(log_dir)
 
         # Geting algorithm config
@@ -61,8 +61,8 @@ class KODOKUTrainer:
         else:
             train_config["training"]["model"] = model_defaults
 
+        # Policies configuration
         policy_mapping_fn_tmp = tmp_env.get_policy_mapping_fn()
-
         if self.policy_mapping_manager is None:
             policy_mapping_function = policy_mapping_fn_tmp
             policies = {
@@ -111,13 +111,11 @@ class KODOKUTrainer:
             .training(**train_config["training"])
         )
         self.trainer = algorithm_config.build_algo()
-        print(self.trainer)
-        exit()
 
-        print_network_architecture(
-            self.trainer,
-            config["multi_agent"]["policies"].keys(),
-        )
+        # print_network_architecture(
+        #     self.trainer,
+        #     policies.keys(),
+        # )
 
     def train(
         self,
@@ -135,28 +133,26 @@ class KODOKUTrainer:
 
         """
         for epoch in range(start_epoch, num_epochs):
-            print(" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ")
-            print(epoch)
-            print(" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ")
+            print(f"~~~~~~~ epoch: {epoch} ~~~~~~~")
             # self.trainer.reset()
             # self.trainer.callbacks.reset()
             result = self.trainer.train()
 
             # Update policy mapping
-            if self.policy_mapping_manager is not None:
-                self.policy_mapping_manager.update_policy_configuration(
-                    self.trainer,
-                    result,
-                    self.reward(),
-                )
+            # if self.policy_mapping_manager is not None:
+            #     self.policy_mapping_manager.update_policy_configuration(
+            #         self.trainer,
+            #         result,
+            #         self.reward(),
+            #     )
 
             # Invoke callback
-            if epoch_callback is not None:
-                epoch_callback(self, epoch, result)
+            # if epoch_callback is not None:
+            #     epoch_callback(self, epoch, result)
 
-            print(result)
+            pretty_print(result)
 
-            self.log_to_tensorboard(epoch, result)
+            # self.log_to_tensorboard(epoch, result)
 
     def log_to_tensorboard(self, epoch, result):
         """."""
