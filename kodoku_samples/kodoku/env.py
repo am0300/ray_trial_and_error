@@ -7,15 +7,17 @@ from typing import Any
 
 import cv2
 import numpy as np
+import ray
 from gymnasium import spaces
 from ray.rllib.evaluation.episode_v2 import EpisodeV2
+from ray.rllib.utils.typing import MultiAgentDict
 
-from sample.schemas import Config
-from sample.simulation_object import SimpleBattlefieldUnit
-from sample.simulator import SimpleBattlefieldSimulator
+from kodoku_samples.kodoku.schemas import Config
+from kodoku_samples.simulator.engine import SimpleBattlefieldSimulator
+from kodoku_samples.simulator.objects import SimpleBattlefieldUnit
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from sample.kodoku.env import MultiEnvWrapper
+from kodoku_samples.kodoku.env_wrapper import MultiEnvWrapper
 
 # renderで使う色
 BLACK = (0, 0, 0)
@@ -30,6 +32,9 @@ class SimpleBattlefieldEnv(MultiEnvWrapper):
     def __init__(self, config: dict[str, Any]) -> None:
         """環境の初期化."""
         super().__init__()
+        if config.get("ray_object_ref"):
+            config_ref = config.get("ray_object_ref")
+            config = ray.get(config_ref)
         self.config = Config.from_dict(config)
 
         self.sim: SimpleBattlefieldSimulator | None = None
@@ -67,7 +72,7 @@ class SimpleBattlefieldEnv(MultiEnvWrapper):
         *,
         seed: int | None,
         options: dict[Any, Any] | None,
-    ) -> tuple[Any, dict[str, Any]]:
+    ) -> tuple[MultiAgentDict, MultiAgentDict]:
         """Reset."""
         # self.scenario_name, self.config = self.config_fn()
         cv2.destroyAllWindows()
@@ -79,8 +84,14 @@ class SimpleBattlefieldEnv(MultiEnvWrapper):
 
     def step(
         self,
-        action_dict: dict[str, Any],
-    ) -> tuple[dict[str, Any], dict[str, float], dict[str, bool], dict]:
+        action_dict: MultiAgentDict,
+    ) -> tuple[
+        MultiAgentDict,
+        MultiAgentDict,
+        MultiAgentDict,
+        MultiAgentDict,
+        MultiAgentDict,
+    ]:
         """Update the environment's state based on the action dict."""
         for unit in self.sim.atk_units + self.sim.def_units:
             if unit.name in action_dict:

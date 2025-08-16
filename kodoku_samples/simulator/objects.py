@@ -1,8 +1,7 @@
-"""シミュレーション上で活動するオブジェクト情報."""
+"""シミュレーション上に配置するオブジェクト情報."""
 
 import numpy as np
-
-from sample.schemas import Unit
+from kodoku_samples.kodoku.schemas import Unit
 
 
 class SimpleBattlefieldUnit:
@@ -11,8 +10,8 @@ class SimpleBattlefieldUnit:
     def __init__(
         self,
         unit: Unit,
-        pos: list[float, float],
-        accel: list[float, float],
+        pos: list[float],
+        accel: list[float],
     ) -> None:
         """Unitの初期化処理."""
         self.unit = unit
@@ -39,36 +38,36 @@ class SimpleBattlefieldUnit:
         return self.unit.name
 
     @property
-    def max_hp(self) -> str:
+    def max_hp(self) -> float:
         """体力の最大値."""
         return self.unit.max_hp
 
     @property
-    def power(self) -> str:
-        """攻撃力."""
+    def power(self) -> float:
+        """出力."""
         return self.unit.power
 
     @property
-    def range(self) -> str:
+    def range(self) -> float:
         """射程."""
         return self.unit.range
 
     @property
-    def speed(self) -> str:
+    def speed(self) -> float:
         """移動速度."""
         return self.unit.speed
 
     @property
-    def pos(self) -> str:
+    def pos(self) -> list[float]:
         """現在の座標."""
         return self._pos
 
     @pos.setter
-    def pos(self, value: list[float, float]) -> None:
+    def pos(self, value: list[float]) -> None:
         self._pos = value
 
     @property
-    def hp(self) -> str:
+    def hp(self) -> float:
         """現在の体力."""
         return self._hp
 
@@ -77,10 +76,10 @@ class SimpleBattlefieldUnit:
         self._hp = value
 
     @property
-    def accel(self) -> list[float, float]:
+    def accel(self) -> list[float]:
         """加速強度."""
         return self._accel
 
     @accel.setter
-    def accel(self, value: float) -> None:
+    def accel(self, value: list[float]) -> None:
         self._accel = value

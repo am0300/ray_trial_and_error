@@ -1,11 +1,10 @@
-"""シミュレータの定義."""
+"""強化学習で使用するシミュレータの定義."""
 
 from typing import Any
 
 import numpy as np
-
-from sample.schemas import Config, Unit
-from sample.simulation_object import SimpleBattlefieldUnit
+from kodoku_samples.kodoku.schemas import Config, Unit
+from kodoku_samples.simulator.objects import SimpleBattlefieldUnit
 
 
 class SimpleBattlefieldSimulator:

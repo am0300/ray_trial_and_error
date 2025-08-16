@@ -1,5 +1,8 @@
+"""."""
+
 import pickle
 from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 import ray
@@ -12,8 +15,8 @@ from ray.rllib.utils.typing import ResultDict
 from ray.tune.logger import pretty_print
 from torch.utils.tensorboard import SummaryWriter
 
-from sample.kodoku.env import EnvWrapper
-from sample.kodoku.policy import *
+from kodoku_samples.kodoku.env_wrapper import EnvWrapper
+from kodoku_samples.kodoku.policy import *
 
 
 class KODOKUTrainer:
@@ -27,7 +30,7 @@ class KODOKUTrainer:
         policy_mapping_manager: PolicyMappingManager | None = None,
         ray_config: dict = {},
     ):
-        """Trainer ctor.
+        """Trainer constructor.
 
         Args:
             log_dir (str): Location to store training summary, trajectory, weight, etc..
@@ -42,6 +45,10 @@ class KODOKUTrainer:
         # Ray initialization
         ray.init(**ray_config)
         assert ray.is_initialized() == True
+        # https://github.com/ray-project/ray/issues/53727 対応
+        env_config_ref = ray.put(env_config)
+        # rayのenv_configはdictしか扱えないためdictにする
+        env_config = {"ray_object_ref": env_config_ref}
 
         # Tensorboard configuration
         self.summaryWriter = SummaryWriter(log_dir)
@@ -155,7 +162,7 @@ class KODOKUTrainer:
             # if epoch_callback is not None:
             #     epoch_callback(self, epoch, result)
 
-            pretty_print(result)
+            print(pretty_print(result))
 
             # self.log_to_tensorboard(epoch, result)
 
@@ -228,7 +235,7 @@ class KODOKUTrainer:
         return result
 
     def evaluate(self) -> ResultDict:
-        """Run evaluation
+        """Run evaluation.
 
         Returns:
             ResultDict: Evaluation result
@@ -239,8 +246,12 @@ class KODOKUTrainer:
         print(pretty_print(result))
         return result
 
+    def shutdown(self) -> None:
+        """rayをshutdownする."""
+        ray.shutdown()
+
     def log(self) -> dict:
-        """Get training log
+        """Get training log.
 
         Returns:
             Dict: log
@@ -249,7 +260,7 @@ class KODOKUTrainer:
         return self.trainer.callbacks.log()
 
     def reward(self) -> dict[int, dict]:
-        """Get training rewards
+        """Get training rewards.
 
         Returns:
                 List: reward
@@ -258,7 +269,7 @@ class KODOKUTrainer:
         return self.trainer.callbacks.reward()
 
     def get_policy(self, policy_id: str) -> Policy:
-        """Get policy instance by id
+        """Get policy instance by id.
 
         Args:
             policy_id (str): Policy id
@@ -268,7 +279,7 @@ class KODOKUTrainer:
         return policy
 
     def save_policy(self, path: str, policy_id: str | None = None) -> None:
-        """Save indivisual or whole policy into file
+        """Save indivisual or whole policy into file.
 
         Args:
             path (str): Save file path
@@ -290,7 +301,7 @@ class KODOKUTrainer:
                 )
 
     def load_policy(self, path: str, policy_id: str | None = None) -> None:
-        """Load indivisual or whole policy from file
+        """Load indivisual or whole policy from file.
 
         Args:
             path (str): Load file path
@@ -317,7 +328,8 @@ class KODOKUTrainer:
         from_policy_id: str,
         to_policy_id: str,
     ) -> None:
-        """Explicitly load policy with different id
+        """Explicitly load policy with different id.
+
         Note that policy's model must have exactly same parameters.
 
         Args:
@@ -331,7 +343,7 @@ class KODOKUTrainer:
             self.get_policy(to_policy_id).set_weights(weights[from_policy_id])
 
     def save_checkpoint(self, path: str) -> None:
-        """Save training checkpoint
+        """Save training checkpoint.
 
         Args:
             path (str): Save dir path
@@ -340,7 +352,7 @@ class KODOKUTrainer:
         pickle.dump(self.trainer.__getstate__(), open(path, "wb"))
 
     def load_checkpoint(self, path: str) -> None:
-        """Load training checkpoint
+        """Load training checkpoint.
 
         Args:
             path (str): Load dir path
@@ -358,7 +370,7 @@ class SingleAgentTrainer(KODOKUTrainer):
         env_config_fn: Callable[[], tuple[str, dict]],
         ray_config: dict = {},
     ):
-        """Trainer ctor
+        """Trainer ctor.
 
         Args:
             log_dir (str): Location to store training summary, trajectory, weight, etc..
@@ -378,7 +390,7 @@ class SingleAgentTrainer(KODOKUTrainer):
         )
 
     def get_policy(self, policy_id: str = DEFAULT_POLICY_ID) -> Policy:
-        """Get policy instance by id
+        """Get policy instance by id.
 
         Args:
             policy_id (str): Policy id
@@ -387,7 +399,7 @@ class SingleAgentTrainer(KODOKUTrainer):
         return super().get_policy(policy_id)
 
     def save_policy(self, path: str) -> None:
-        """Save indivisual or whole policy into file
+        """Save indivisual or whole policy into file.
 
         Args:
             path (str): Save file path
@@ -396,7 +408,7 @@ class SingleAgentTrainer(KODOKUTrainer):
         super().save_policy(path, DEFAULT_POLICY_ID)
 
     def load_policy(self, path: str) -> None:
-        """Load indivisual or whole policy from file
+        """Load indivisual or whole policy from file.
 
         Args:
             path (str): Load file path

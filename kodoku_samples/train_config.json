@@ -4,7 +4,7 @@
 
 	"env_runners": {
 		"num_env_runners": 1,
-		"num_cpus_per_env_runner": 0,
+		"num_cpus_per_env_runner": 1,
 		"num_gpus_per_env_runner": 0,
 		"num_envs_per_env_runner": 8,
 		"rollout_fragment_length": "auto",
@@ -37,5 +37,9 @@
 
 	"multi_agent": {
 		"policies_to_train": null
+	},
+
+	"resources": {
+		"num_gpus": 0.0
 	}
 }

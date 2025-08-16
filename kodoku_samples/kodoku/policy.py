@@ -1,11 +1,12 @@
 from abc import ABCMeta, abstractmethod
-from typing import *
+from collections.abc import Callable
 
 import numpy as np
 from ray.rllib.algorithms import Algorithm
 from ray.rllib.evaluation.episode_v2 import EpisodeV2
 from ray.rllib.utils.typing import ResultDict
-from sample.kodoku.utils import ScheduleScaler
+
+from kodoku_samples.kodoku.utils import ScheduleScaler
 
 
 class PolicyMappingManager(metaclass=ABCMeta):
@@ -16,7 +17,7 @@ class PolicyMappingManager(metaclass=ABCMeta):
         policy_id: str,
         episode: EpisodeV2,
     ) -> str:
-        """Subpolicy to policy mapping function
+        """Subpolicy to policy mapping function.
 
         Args:
             agent_id (str): Agent name
@@ -30,8 +31,8 @@ class PolicyMappingManager(metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    def get_policy_mapping_list(self, policy_id: str) -> List[str]:
-        """Get all possible policy mapping
+    def get_policy_mapping_list(self, policy_id: str) -> list[str]:
+        """Get all possible policy mapping.
 
         Args:
             policy_id (str): Policy name
@@ -44,9 +45,9 @@ class PolicyMappingManager(metaclass=ABCMeta):
         self,
         trainer: Algorithm,
         result: ResultDict,
-        reward_list: List[Dict],
+        reward_list: list[dict],
     ) -> None:
-        """Update policy mapping according to training result, if necessary
+        """Update policy mapping according to training result, if necessary.
 
         Args:
             trainer (Algorithm): Trainer instance
@@ -61,7 +62,7 @@ class PolicyMappingManager(metaclass=ABCMeta):
 
 
 class DefaultPolicyMappingManager(PolicyMappingManager):
-    """Identity policy mapping"""
+    """Identity policy mapping."""
 
     def get_policy_mapping(
         self,
@@ -71,14 +72,14 @@ class DefaultPolicyMappingManager(PolicyMappingManager):
     ) -> str:
         return policy_id
 
-    def get_policy_mapping_list(self, policy_id: str) -> List[str]:
+    def get_policy_mapping_list(self, policy_id: str) -> list[str]:
         return [policy_id]
 
     def update_policy_configuration(
         self,
         trainer: Algorithm,
         result: ResultDict,
-        reward_list: List[Dict],
+        reward_list: list[dict],
     ) -> None:
         return
 
@@ -88,10 +89,11 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
         self,
         agent_force_mapping_fn: Callable[[str], str],
         num_subpolicies: int,
-        subpolicy_priority_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
-        wolf_fn: Optional[Callable[[float], float]] = None,
+        subpolicy_priority_fn: Callable[[np.ndarray], np.ndarray] | None = None,
+        wolf_fn: Callable[[float], float] | None = None,
     ):
-        """FictitiousSelfPlayManager
+        """FictitiousSelfPlayManager.
+
         This class enables plug-and-play style self-play training scheme.
         Agents are divided into two teams "blufor" and "redfor" to learn competitively,
         while each policy may have multiple "subpolicies" to represent various strategies.
@@ -106,8 +108,8 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
         """
         self.agent_force_mapping_fn = agent_force_mapping_fn
         self.num_subpolicies = num_subpolicies
-        self.episode_policy_mapping: Dict[int, Tuple[int, int]] = {}
-        self.episode_agent_mapping: Dict[int, Dict[str, str]] = {}
+        self.episode_policy_mapping: dict[int, tuple[int, int]] = {}
+        self.episode_agent_mapping: dict[int, dict[str, str]] = {}
         self.match_results = [
             [[] for ri in range(self.num_subpolicies)]
             for bi in range(self.num_subpolicies)
@@ -125,8 +127,9 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
 
         self.wolf_fn = wolf_fn
 
-    def policy_selection(self) -> Dict[str, int]:
-        """Policy selection
+    def policy_selection(self) -> dict[str, int]:
+        """Policy selection.
+
         Returns subpolicy ids for each team
         (i.e., same team agents have same subpolicy through an episode)
         Can be overriden to do something more complicated (e.g. Priorized FSP),
@@ -143,7 +146,7 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
         }
 
     def subpolicy_name(self, policy_id: str, index: int) -> str:
-        """Subpolicy naming rule (Necessary for rllib communication)
+        """Subpolicy naming rule (Necessary for rllib communication).
 
         Args:
             policy_id (str): Policy id
@@ -161,7 +164,7 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
         policy_id: str,
         episode: EpisodeV2,
     ) -> str:
-        """Maps policy to subpolicy
+        """Maps policy to subpolicy.
 
         Args:
             agent_id (str): agent id (Used to determine policy_id)
@@ -186,8 +189,8 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
             self.episode_policy_mapping[episode.episode_id][force],
         )
 
-    def get_policy_mapping_list(self, policy_id: str) -> List[str]:
-        """Returns all possible subpolicy mappings from a policy
+    def get_policy_mapping_list(self, policy_id: str) -> list[str]:
+        """Returns all possible subpolicy mappings from a policy.
 
         Args:
             policy_id (str): policy id
@@ -202,9 +205,10 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
         self,
         trainer: Algorithm,
         result: ResultDict,
-        reward_list: List[Dict],
+        reward_list: list[dict],
     ) -> None:
-        """Update policy configuration
+        """Update policy configuration.
+
         Calls user-defined configuration function after computing blufor vs redfor subpolicy reward matrix.
 
         Args:
@@ -251,10 +255,11 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
 
     def compute_match_results(
         self,
-        reward_list: List[Dict],
+        reward_list: list[dict],
         ma_length: int = 1000,
-    ) -> Tuple[Dict[str, List[float]], np.ndarray, Dict[str, List[str]]]:
-        """Compute blufor vs redfor subpolicy reward matrix
+    ) -> tuple[dict[str, list[float]], np.ndarray, dict[str, list[str]]]:
+        """Compute blufor vs redfor subpolicy reward matrix.
+
         Result of this function can be used to determine which subpolicy to utilize, which subpolicy to train more,
         or which subpolicy to choose as an opponent.
         Returns None if number of samples are insufficient (Specific subpolicy combination did not appear)
@@ -332,12 +337,12 @@ class FictitiousSelfPlayManager(PolicyMappingManager):
 
 
 class SelfPlayManager(FictitiousSelfPlayManager):
-    """Specialized case of FictitiousSelfPlayManager where number of subpolicies is one"""
+    """Specialized case of FictitiousSelfPlayManager where number of subpolicies is one."""
 
     def __init__(
         self,
         agent_force_mapping_fn: Callable[[str], str],
-        wolf_fn: Optional[Callable[[float, float], float]] = None,
+        wolf_fn: Callable[[float, float], float] | None = None,
     ):
         super().__init__(agent_force_mapping_fn, 1, wolf_fn)
 

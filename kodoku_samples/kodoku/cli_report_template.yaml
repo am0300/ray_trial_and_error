@@ -1,0 +1,137 @@
+# CLI reporterに設定できる項目
+actor_manager_num_outstanding_async_reqs: 0
+agent_timesteps_total: 17791
+counters:
+  num_agent_steps_sampled: 17791
+  num_agent_steps_trained: 17791
+  num_env_steps_sampled: 2560
+  num_env_steps_trained: 2560
+custom_metrics: {}
+date: 2025-08-16_15-30-44
+done: false
+env_runners:
+  connector_metrics:
+    ObsPreprocessorConnector_ms: 0.021476405007498606
+    StateBufferConnector_ms: 0.0
+    ViewRequirementAgentConnector_ms: 0.5069596426827567
+  custom_metrics: {}
+  episode_len_mean: 122.42857142857143
+  episode_media: {}
+  episode_return_max: 1.0379999999999996
+  episode_return_mean: 0.5918571428571427
+  episode_return_min: -1.1820000000000004
+  episode_reward_max: 1.0379999999999996
+  episode_reward_mean: 0.5918571428571427
+  episode_reward_min: -1.1820000000000004
+  episodes_this_iter: 0
+  episodes_timesteps_total: 857
+  hist_stats:
+    episode_lengths: [139, 140, 170, 180, 62, 82, 84]
+    episode_reward: [0.8609999999999999, 0.86, 0.8299999999999997, 0.8200000000000001,
+      1.0379999999999996, -1.1820000000000004, 0.9160000000000001]
+    policy_atk_reward: [0.8609999999999999, 0.8609999999999999, 0.8609999999999999,
+      0.8609999999999999, 0.8599999999999999, 0.8599999999999999, 0.8599999999999999,
+      0.8599999999999999, 0.8299999999999998, 0.8299999999999998, 0.8299999999999998,
+      0.8299999999999998, 0.8199999999999998, 0.8199999999999998, 0.8199999999999998,
+      0.8199999999999998, 1.038, 1.038, 1.038, 1.038, -1.182, -1.182, -1.182, -1.182,
+      0.9159999999999999, 0.9159999999999999, 0.9159999999999999, 0.9159999999999999]
+    policy_def_reward: [-0.8609999999999999, -0.8609999999999999, -0.8609999999999999,
+      -0.8599999999999999, -0.8599999999999999, -0.8599999999999999, -0.8299999999999998,
+      -0.8299999999999998, -0.8299999999999998, -0.8199999999999998, -0.8199999999999998,
+      -0.8199999999999998, -1.038, -1.038, -1.038, 1.182, 1.182, 1.182, -0.9159999999999999,
+      -0.916, -0.9159999999999999]
+  num_episodes: 0
+  num_faulty_episodes: 0
+  policy_reward_max:
+    atk: 1.038
+    def: 1.182
+  policy_reward_mean:
+    atk: 0.5918571428571429
+    def: -0.5918571428571427
+  policy_reward_min:
+    atk: -1.182
+    def: -1.038
+  sampler_perf:
+    mean_action_processing_ms: 5.731059748721236
+    mean_env_render_ms: 0.0
+    mean_env_wait_ms: 89.2677846064706
+    mean_inference_ms: 2.786370127122058
+    mean_raw_obs_processing_ms: 18.118757648573844
+episode_media: {}
+hostname: DESKTOP-ESVDGTQ
+info:
+  learner:
+    atk:
+      custom_metrics: {}
+      diff_num_grad_updates_vs_sampler_policy: 119.5
+      learner_stats:
+        allreduce_latency: 0.0
+        cur_kl_coeff: 0.6750000000000002
+        cur_lr: 0.00040000000000000013
+        entropy: 3.1010415305693946
+        entropy_coeff: 0.0
+        grad_gnorm: 1.4233742952346802
+        kl: 0.01473888062437254
+        policy_loss: -0.02015689540033539
+        total_loss: -0.008662735049923261
+        vf_explained_var: 0.9255904001494248
+        vf_loss: 0.001545416485654035
+      model: {}
+      num_agent_steps_trained: 128.0
+      num_grad_updates_lifetime: 2280.5
+    def:
+      custom_metrics: {}
+      diff_num_grad_updates_vs_sampler_policy: 89.5
+      learner_stats:
+        allreduce_latency: 0.0
+        cur_kl_coeff: 0.6749999999999998
+        cur_lr: 0.0004000000000000001
+        entropy: 2.50529512696796
+        entropy_coeff: 0.0
+        grad_gnorm: 1.601891040802002
+        kl: 0.012905742980365176
+        policy_loss: -0.01400262667512935
+        total_loss: -0.003556829018311368
+        vf_explained_var: 0.8945765058199565
+        vf_loss: 0.0017344220467041143
+      model: {}
+      num_agent_steps_trained: 128.0
+      num_grad_updates_lifetime: 1710.5
+  num_agent_steps_sampled: 17791
+  num_agent_steps_trained: 17791
+  num_env_steps_sampled: 2560
+  num_env_steps_trained: 2560
+iterations_since_restore: 10
+node_ip: 127.0.0.1
+num_agent_steps_sampled: 17791
+num_agent_steps_sampled_lifetime: 17791
+num_agent_steps_trained: 17791
+num_env_steps_sampled: 2560
+num_env_steps_sampled_lifetime: 2560
+num_env_steps_sampled_this_iter: 256
+num_env_steps_sampled_throughput_per_sec: 44.42585711732889
+num_env_steps_trained: 2560
+num_env_steps_trained_this_iter: 256
+num_env_steps_trained_throughput_per_sec: 44.42585711732889
+num_healthy_workers: 1
+num_remote_worker_restarts: 0
+num_steps_trained_this_iter: 256
+perf:
+  cpu_util_percent: 10.65
+  ram_util_percent: 46.5
+pid: 19664
+time_since_restore: 55.715959548950195
+time_this_iter_s: 5.76893424987793
+time_total_s: 55.715959548950195
+timers:
+  learn_throughput: 145.825
+  learn_time_ms: 1755.527
+  restore_workers_time_ms: 0.0
+  sample_time_ms: 3778.168
+  synch_weights_time_ms: 32.727
+  training_iteration_time_ms: 5566.62
+  training_step_time_ms: 5566.62
+timestamp: 1755325844
+timesteps_total: 2560
+training_iteration: 10
+trial_id: default

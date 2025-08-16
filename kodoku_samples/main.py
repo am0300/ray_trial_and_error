@@ -1,14 +1,16 @@
+"""非対称 Multi Agent 強化学習の実行."""
+
 import json
 import os
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from sample.battle_field_env import SimpleBattlefieldEnv
-from sample.kodoku.trainer import KODOKUTrainer
-from sample.kodoku.utils import LogCallbacksOldAPI as LogCallbacks
+from kodoku_samples.kodoku.env import SimpleBattlefieldEnv
+from kodoku_samples.kodoku.trainer import KODOKUTrainer
+from kodoku_samples.kodoku.utils import LogCallbacksOldAPI as LogCallbacks
 
-# from sample.kodoku.utils import LogCallbacksNewAPI as LogCallbacks
+# from kodoku_sample.kodoku.utils import LogCallbacksNewAPI as LogCallbacks
 
 simulator_config = {
     "depth": 2.0,
@@ -40,9 +42,10 @@ if __name__ == "__main__":
         log_dir="./log_dir",
         env_class=SimpleBattlefieldEnv,
         callbacks=LogCallbacks,
-        train_config=json.load(open("./sample/train_config.json")),
+        train_config=json.load(open("./kodoku_samples/train_config.json")),
         env_config=simulator_config,
     )
 
     trainer.train(10, epoch_callback=callback)
     trainer.evaluate()
+    trainer.shutdown()

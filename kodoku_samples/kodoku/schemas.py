@@ -1,4 +1,4 @@
-"""スキーマ定義."""
+"""Schemas."""
 
 from typing import Any
 
@@ -10,7 +10,7 @@ class Unit(BaseModel):
 
     name: str  # 名前
     max_hp: float  # 体力の最大値
-    power: float  # 攻撃力
+    power: float  # 出力
     range: float  # 射程
     speed: float  # 移動速度
 
