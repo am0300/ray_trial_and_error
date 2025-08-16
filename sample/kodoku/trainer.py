@@ -3,16 +3,17 @@ from collections.abc import Callable
 
 import numpy as np
 import ray
+from ray.rllib.algorithms.callbacks import DefaultCallbacks
 from ray.rllib.algorithms.registry import ALGORITHMS
 from ray.rllib.models import MODEL_DEFAULTS
 from ray.rllib.policy.policy import Policy, PolicySpec
 from ray.rllib.policy.sample_batch import DEFAULT_POLICY_ID
 from ray.rllib.utils.typing import ResultDict
 from ray.tune.logger import pretty_print
+from torch.utils.tensorboard import SummaryWriter
+
 from sample.kodoku.env import EnvWrapper
 from sample.kodoku.policy import *
-from sample.kodoku.utils import LogCallbacks
-from torch.utils.tensorboard import SummaryWriter
 
 
 class KODOKUTrainer:
@@ -20,8 +21,9 @@ class KODOKUTrainer:
         self,
         log_dir: str,
         env_class: type[EnvWrapper],
+        callbacks: type[DefaultCallbacks],
         train_config: dict[str, Any],
-        env_config_fn: Callable[[], tuple[str, dict]],
+        env_config: dict[str, Any],
         policy_mapping_manager: PolicyMappingManager | None = None,
         ray_config: dict = {},
     ):
@@ -48,7 +50,6 @@ class KODOKUTrainer:
         _, config = ALGORITHMS[train_config["algorithm"]]()
 
         # Environment configuration
-        env_config = {"fn": env_config_fn}
         self.policy_mapping_manager = policy_mapping_manager
         tmp_env = env_class(config=env_config)
 
@@ -96,18 +97,22 @@ class KODOKUTrainer:
 
         # Initialize trainer
         algorithm_config = (
-            config.multi_agent(
+            config.api_stack(
+                enable_env_runner_and_connector_v2=False,
+                enable_rl_module_and_learner=False,
+            )
+            .multi_agent(
                 policies=policies,
                 policy_mapping_fn=policy_mapping_function,
                 **train_config["multi_agent"],
             )
             .environment(
                 env=env_class,
-                env_config={"fn": env_config_fn},
+                env_config=env_config,
                 **train_config["environment"],
             )
             .env_runners(**train_config["env_runners"])
-            .callbacks(callbacks_class=LogCallbacks)
+            .callbacks(callbacks_class=callbacks)
             .training(**train_config["training"])
         )
         self.trainer = algorithm_config.build_algo()

@@ -1,3 +1,5 @@
+"""環境の定義."""
+
 import os
 import sys
 from collections.abc import Callable
@@ -6,8 +8,11 @@ from typing import Any
 import cv2
 import numpy as np
 from gymnasium import spaces
-from ray.rllib.env.env_context import EnvContext
 from ray.rllib.evaluation.episode_v2 import EpisodeV2
+
+from sample.schemas import Config
+from sample.simulation_object import SimpleBattlefieldUnit
+from sample.simulator import SimpleBattlefieldSimulator
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from sample.kodoku.env import MultiEnvWrapper
@@ -19,238 +24,16 @@ RED = (0, 0, 255)
 RENDER_FPS = 1
 
 
-class SimpleBattlefieldUnit:
-    """Unit単体の物理・HP管理."""
-
-    def __init__(
-        self,
-        pos: np.ndarray,  # 座標
-        hp: float,  # 体力
-        power: float,  # 攻撃力
-        range: float,  # 射程
-        speed: float,  # 移動速度
-        name: str,  # 名前
-    ) -> None:
-        """Unitの初期化処理."""
-        self.pos = pos
-        self.hp = hp
-        self.max_hp = hp
-        self.power = power
-        self.range = range
-        self.speed = speed
-        self.accel = np.float32([0, 0])
-        self._name = name
-
-    def step(self, zoc: float, pos_min: np.ndarray, pos_max: np.ndarray) -> None:
-        """Unitの行動を1step進める."""
-        if self.hp <= 0:
-            print(f"+++++ unit name: {self.name} is destroyed. +++++")
-            return
-
-        self.pos += self.speed * self.accel * (1 - zoc)
-        self.pos = np.clip(self.pos, a_min=pos_min, a_max=pos_max)
-
-    def do_damage(self, damage: float) -> None:
-        """Unitが受けたダメージ処理."""
-        self.hp = max(0, self.hp - damage)
-
-    @property
-    def name(self) -> str:
-        """Unitの名前."""
-        return self._name
-
-
-class SimpleBattlefieldSimulator:
-    """戦場全体の時間進行・戦闘処理."""
-
-    def __init__(
-        self,
-        depth: float,
-        width: float,
-        atk_spawn_line: float,
-        def_spawn_line: float,
-        atk_num: int,
-        def_num: int,
-        atk_unit_hp: float,
-        atk_unit_power: float,
-        atk_unit_range: float,
-        atk_unit_speed: float,
-        def_unit_hp: float,
-        def_unit_power: float,
-        def_unit_range: float,
-        def_unit_speed: float,
-        timelimit: int,
-        **kwargs,
-    ) -> None:
-        """シミュレーションの初期化."""
-        self.depth = depth  # 戦場の奥行
-        self.width = width  # 戦場の幅
-        self.timelimit = timelimit  # 戦闘時間
-
-        rng = np.random.default_rng()
-        self.atk_units = [
-            SimpleBattlefieldUnit(
-                np.array(
-                    [
-                        rng.uniform(atk_spawn_line, depth),
-                        rng.uniform(0, width),
-                    ],
-                ),
-                atk_unit_hp,
-                atk_unit_power,
-                atk_unit_range,
-                atk_unit_speed,
-                "atk" + str(i),
-            )
-            for i in range(atk_num)
-        ]
-
-        self.def_units = [
-            SimpleBattlefieldUnit(
-                np.array(
-                    [rng.uniform(0, def_spawn_line), rng.uniform(0, width)],
-                ),
-                def_unit_hp,
-                def_unit_power,
-                def_unit_range,
-                def_unit_speed,
-                "def" + str(i),
-            )
-            for i in range(def_num)
-        ]
-
-        self.elapsed = 0
-
-    def step(self) -> dict[str, Any]:
-        """シミュレーションを1step進める."""
-        self.elapsed += 1
-
-        # calc zoc
-        atk_pos = np.array([unit.pos for unit in self.atk_units])
-        def_pos = np.array([unit.pos for unit in self.def_units])
-        atk_power = np.array([unit.power for unit in self.atk_units])
-        def_power = np.array([unit.power for unit in self.def_units])
-        atk_range = np.array([unit.range for unit in self.atk_units])
-        def_range = np.array([unit.range for unit in self.def_units])
-        atk_integrity = np.maximum(
-            np.array([unit.hp / unit.max_hp for unit in self.atk_units]),
-            0,
-        )
-        def_integrity = np.maximum(
-            np.array([unit.hp / unit.max_hp for unit in self.def_units]),
-            0,
-        )
-
-        dist = np.linalg.norm(
-            atk_pos[np.newaxis, :, :] - def_pos[:, np.newaxis, :],
-            axis=2,
-        )
-        zoc_atk = np.sqrt(np.maximum(1 - 3 * dist / (4 * atk_range), 0)) * atk_integrity
-        zoc_def = (
-            np.sqrt(np.maximum(1 - 3 * dist.T / (4 * def_range), 0)) * def_integrity
-        )
-
-        # calc damage
-        damage_atk = np.sum(zoc_atk * atk_power, axis=1)
-        damage_def = np.sum(zoc_def * def_power, axis=1)
-        atk_killed = 0
-        def_killed = 0
-        for ui, unit in enumerate(self.atk_units):
-            hp_old = unit.hp
-            unit.do_damage(damage_def[ui])
-            if hp_old > 0 and unit.hp <= 0:
-                atk_killed += 1
-
-        for ui, unit in enumerate(self.def_units):
-            hp_old = unit.hp
-            unit.do_damage(damage_atk[ui])
-            if hp_old > 0 and unit.hp <= 0:
-                def_killed += 1
-
-        # move units
-        for ui, unit in enumerate(self.atk_units):
-            unit.step(
-                np.sum(zoc_def[ui]),
-                np.float32([0, 0]),
-                np.float32([self.depth, self.width]),
-            )
-        for ui, unit in enumerate(self.def_units):
-            unit.step(
-                np.sum(zoc_atk[ui]),
-                np.float32([0, 0]),
-                np.float32([self.depth, self.width]),
-            )
-
-        # event
-        events = {}
-        events["ATK_KILLED"] = atk_killed
-        events["DEF_KILLED"] = def_killed
-
-        atk_integrity = np.maximum(
-            np.array([unit.hp / unit.max_hp for unit in self.atk_units]),
-            0,
-        )
-        def_integrity = np.maximum(
-            np.array([unit.hp / unit.max_hp for unit in self.def_units]),
-            0,
-        )
-
-        if np.sum(atk_integrity > 0) <= len(self.atk_units) / 2:
-            events["ATK_EXTINCT"] = 1
-        if np.sum(def_integrity > 0) <= len(self.def_units) / 2:
-            events["DEF_EXTINCT"] = 1
-
-        if self.elapsed >= self.timelimit:
-            events["TIMELIMIT"] = 1
-        events["TIME_ELAPSE"] = 1 / self.timelimit
-
-        return events
-
-
-class ExtendedSimulator(SimpleBattlefieldSimulator):
-    """防衛シナリオ用拡張シミュレータ."""
-
-    def __init__(self, def_line: float, **kwargs) -> None:
-        """シミュレーションの初期化."""
-        super().__init__(**kwargs)
-        self.def_line = def_line
-
-    def step(self) -> dict[str, Any]:
-        """シミュレーションを1step進める."""
-        events = super().step()
-
-        atk_pos = np.array([unit.pos for unit in self.atk_units])
-        atk_integrity = np.maximum(
-            np.array([unit.hp / unit.max_hp for unit in self.atk_units]),
-            0,
-        )
-
-        atk_mean_pos_old = np.mean(atk_pos[:, 0])
-        atk_pos = np.array([unit.pos for unit in self.atk_units])
-        events["ATK_APPROACH"] = (np.mean(atk_pos[:, 0]) - atk_mean_pos_old) / (
-            self.depth - self.def_line
-        )
-
-        if (
-            np.sum((atk_pos[:, 0] <= self.def_line) & (atk_integrity > 0))
-            >= len(self.atk_units) / 2
-        ):
-            events["ATK_BREACH"] = 1
-
-        return events
-
-
 class SimpleBattlefieldEnv(MultiEnvWrapper):
     """非対称型RL環境."""
 
-    def __init__(self, config: EnvContext) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         """環境の初期化."""
         super().__init__()
-        self.config_fn = config["fn"]
+        self.config = Config.from_dict(config)
 
-        self.sim: ExtendedSimulator | None = None
+        self.sim: SimpleBattlefieldSimulator | None = None
         self.scenario_name = None
-        self.config = None
 
         self.viewer = None
         self.possible_agents = ["atk0", "atk1", "atk2", "atk3", "def0", "def1", "def2"]
@@ -263,16 +46,34 @@ class SimpleBattlefieldEnv(MultiEnvWrapper):
             self.observation_spaces[agent_id] = space_dict[policy_id][0]
             self.action_spaces[agent_id] = space_dict[policy_id][1]
 
-    def initialize_simulator(self, config: dict) -> ExtendedSimulator:
+    def initialize_simulator(self, config: Config) -> SimpleBattlefieldSimulator:
         """シミュレータを初期化する."""
         self.events = {}  # シミュレーションのstepで発生したeventの辞書
-        return ExtendedSimulator(**config)
+        return SimpleBattlefieldSimulator(config)
 
-    def reset(self, *, seed, options) -> dict[str, Any]:
+    def initialize_agent_episode_flag(self) -> None:
+        """episodeの終了判定フラグを初期化する."""
+        self.terminated = {
+            unit.name: False for unit in self.sim.atk_units + self.sim.def_units
+        }
+        self.truncated = {
+            unit.name: False for unit in self.sim.atk_units + self.sim.def_units
+        }
+        self.terminated["__all__"] = False
+        self.truncated["__all__"] = False
+
+    def reset(
+        self,
+        *,
+        seed: int | None,
+        options: dict[Any, Any] | None,
+    ) -> tuple[Any, dict[str, Any]]:
         """Reset."""
-        self.scenario_name, self.config = self.config_fn()
+        # self.scenario_name, self.config = self.config_fn()
+        cv2.destroyAllWindows()
         self.sim = self.initialize_simulator(self.config)
-        obs = self.get_obs()
+        self.initialize_agent_episode_flag()
+        obs = self.get_obs(self.terminated, self.truncated)
         self.agents = list(obs.keys())
         return obs, {}
 
@@ -287,35 +88,29 @@ class SimpleBattlefieldEnv(MultiEnvWrapper):
 
         self.events = self.sim.step()
 
+        # 報酬の計算と終了判定
         rewards = {unit.name: 0 for unit in self.sim.atk_units + self.sim.def_units}
-        terminated = {
-            unit.name: False for unit in self.sim.atk_units + self.sim.def_units
-        }
-        truncated = {
-            unit.name: False for unit in self.sim.atk_units + self.sim.def_units
-        }
-        terminated["__all__"] = False
-        truncated["__all__"] = False
-
-        rewards, terminated, truncated = self.calc_reward(
+        rewards, self.terminated, self.truncated = self.calc_reward(
             rewards,
-            terminated,
-            truncated,
+            self.terminated,
+            self.truncated,
             self.sim.atk_units,
             1.0,
         )
-        rewards, terminated, truncated = self.calc_reward(
+        rewards, self.terminated, self.truncated = self.calc_reward(
             rewards,
-            terminated,
-            truncated,
+            self.terminated,
+            self.truncated,
             self.sim.def_units,
             -1.0,
         )
-        obs = self.get_obs()
+
+        # 観測を生成
+        obs = self.get_obs(self.terminated, self.truncated)
         self.agents = list(obs.keys())
 
         self.render()
-        return obs, rewards, terminated, truncated, {}
+        return obs, rewards, self.terminated, self.truncated, {}
 
     def log(self) -> dict:
         """Log."""
@@ -324,7 +119,7 @@ class SimpleBattlefieldEnv(MultiEnvWrapper):
     def get_spaces(self) -> dict[str, tuple[spaces.Space, spaces.Space]]:
         """環境の空間情報を取得する."""
         if self.sim is None:
-            self.sim = self.initialize_simulator(self.config_fn()[1])
+            self.sim = self.initialize_simulator(self.config)
             print("Initialized dummy env to compute spaces.")
 
         obs_space = spaces.Box(
@@ -344,7 +139,7 @@ class SimpleBattlefieldEnv(MultiEnvWrapper):
 
     def get_policy_mapping_fn(self) -> Callable[[str, EpisodeV2], str]:
         if self.sim is None:
-            self.sim = self.initialize_simulator(self.config_fn()[1])
+            self.sim = self.initialize_simulator(self.config)
             print("Initialized dummy env to compute spaces.")
 
         def policy_mapping_fn(
@@ -363,25 +158,43 @@ class SimpleBattlefieldEnv(MultiEnvWrapper):
 
         return policy_mapping_fn
 
-    def get_obs(self) -> dict[str, Any]:
-        def append_obs(obs, unit):
+    def get_obs(
+        self,
+        terminated: dict[str, Any],
+        truncated: dict[str, Any],
+    ) -> dict[str, Any]:
+        """観測を取得する."""
+
+        def append_obs(
+            obs: list[float],
+            unit: SimpleBattlefieldUnit,
+        ) -> list[float]:
             obs.append(unit.pos[0] / self.sim.depth)
             obs.append(unit.pos[1] / self.sim.width)
             obs.append(unit.hp / unit.max_hp)
             return obs
 
-        def make_obs(blue_agents, red_agents):
+        def make_obs(
+            blue_agents: list[SimpleBattlefieldUnit],
+            red_agents: list[SimpleBattlefieldUnit],
+        ) -> dict[str, list[float]]:
+            """観測を生成する."""
             obs_dict = {}
-            for ai_idx, agent in enumerate(blue_agents):
-                if agent.hp <= 0:
+            for idx, agent in enumerate(blue_agents):
+                if terminated[agent.name] or truncated[agent.name]:
+                    print(f"++++++ skip make obs: {agent.name} ++++++")
+                    print(f"terminated: {terminated}")
+                    print(f"truncated: {truncated}")
                     continue
 
                 obs = []
                 for i in range(len(blue_agents)):
-                    unit = blue_agents[(ai_idx + i) % len(blue_agents)]
+                    # 自分のindex番号を先頭に順番に観測を生成していく
+                    unit = blue_agents[(idx + i) % len(blue_agents)]
                     obs = append_obs(obs, unit)
 
                 for i in range(len(red_agents)):
+                    # 相手はindex順に観測を生成
                     unit = red_agents[i]
                     obs = append_obs(obs, unit)
 
@@ -408,28 +221,21 @@ class SimpleBattlefieldEnv(MultiEnvWrapper):
     ):
         """報酬を計算する."""
         for unit in unit_list:
-            if self.events.get("ATK_KILLED"):
-                rewards[unit.name] -= (
-                    kill_reward_scale * self.events["ATK_KILLED"] * scale
-                )
-            if self.events.get("DEF_KILLED"):
-                rewards[unit.name] += (
-                    kill_reward_scale * self.events["DEF_KILLED"] * scale
-                )
-            if self.events.get("ATK_APPROACH"):
-                rewards[unit.name] += (
-                    approach_reward_scale * self.events["ATK_APPROACH"] * scale
-                )
+            rewards[unit.name] -= kill_reward_scale * self.events["ATK_KILLED"] * scale
+            rewards[unit.name] += kill_reward_scale * self.events["DEF_KILLED"] * scale
+            rewards[unit.name] += (
+                approach_reward_scale * self.events["ATK_APPROACH"] * scale
+            )
 
             rewards[unit.name] -= timeelapse_reward * self.events["TIME_ELAPSE"] * scale
 
-            if "ATK_BREACH" in self.events:
+            if self.events.get("ATK_BREACH"):
                 rewards[unit.name] += breach_reward * scale
                 terminated["__all__"] = True
-            if "ATK_EXTINCT" in self.events:
+            if self.events.get("ATK_EXTINCT"):
                 rewards[unit.name] -= extinct_reward * scale
                 terminated["__all__"] = True
-            if "TIMELIMIT" in self.events:
+            if self.events.get("TIMELIMIT"):
                 rewards[unit.name] -= timelimit_reward * scale
                 truncated["__all__"] = True
 
