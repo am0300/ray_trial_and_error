@@ -1,7 +1,7 @@
 """シミュレーション上に配置するオブジェクト情報."""
 
 import numpy as np
-from kodoku_samples.kodoku.schemas import Unit
+from kodoku.schemas import Unit
 
 
 class SimpleBattlefieldUnit:

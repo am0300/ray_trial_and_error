@@ -6,7 +6,7 @@ from ray.rllib.algorithms import Algorithm
 from ray.rllib.evaluation.episode_v2 import EpisodeV2
 from ray.rllib.utils.typing import ResultDict
 
-from kodoku_samples.kodoku.utils import ScheduleScaler
+from kodoku.utils import ScheduleScaler
 
 
 class PolicyMappingManager(metaclass=ABCMeta):

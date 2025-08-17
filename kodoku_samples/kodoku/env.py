@@ -12,12 +12,10 @@ from gymnasium import spaces
 from ray.rllib.evaluation.episode_v2 import EpisodeV2
 from ray.rllib.utils.typing import MultiAgentDict
 
-from kodoku_samples.kodoku.schemas import Config
-from kodoku_samples.simulator.engine import SimpleBattlefieldSimulator
-from kodoku_samples.simulator.objects import SimpleBattlefieldUnit
-
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from kodoku_samples.kodoku.env_wrapper import MultiEnvWrapper
+from kodoku.schemas import Config
+from simulator.engine import SimpleBattlefieldSimulator
+from simulator.objects import SimpleBattlefieldUnit
+from kodoku.env_wrapper import MultiEnvWrapper
 
 # renderで使う色
 BLACK = (0, 0, 0)
@@ -288,7 +286,7 @@ class SimpleBattlefieldEnv(MultiEnvWrapper):
                     (int(unit.pos[0] * img_scale), int(unit.pos[1] * img_scale)),
                     int(unit.range * img_scale),
                     (0, 0, int(255 * unit.hp / unit.max_hp)),
-                    1,
+                    2,
                 )
                 cv2.drawMarker(
                     img,
@@ -302,7 +300,7 @@ class SimpleBattlefieldEnv(MultiEnvWrapper):
                     (int(unit.pos[0] * img_scale), int(unit.pos[1] * img_scale)),
                     int(unit.range * img_scale),
                     (int(255 * unit.hp / unit.max_hp), 0, 0),
-                    1,
+                    2,
                 )
                 cv2.drawMarker(
                     img,

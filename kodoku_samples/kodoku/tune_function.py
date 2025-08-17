@@ -17,9 +17,9 @@ from ray.rllib.utils.metrics import (
 )
 from ray.tune.result import TRAINING_ITERATION
 
-from kodoku_samples.kodoku.env import SimpleBattlefieldEnv
-from kodoku_samples.kodoku.env_wrapper import EnvWrapper
-from kodoku_samples.kodoku.policy import *
+from kodoku.env import SimpleBattlefieldEnv
+from kodoku.env_wrapper import EnvWrapper
+from kodoku.policy import *
 
 # 設定できる項目は同ディレクトリのcli_report_template.yamlを参照
 my_multi_agent_progress_reporter = tune.CLIReporter(
@@ -160,7 +160,7 @@ def tune_function(
         run_config=tune.RunConfig(
             stop=stop2,
             verbose=2,
-            callbacks=[callbacks],
+            # callbacks=[callbacks],
             progress_reporter=my_multi_agent_progress_reporter,
         ),
         tune_config=tune.TuneConfig(

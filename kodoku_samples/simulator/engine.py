@@ -3,8 +3,8 @@
 from typing import Any
 
 import numpy as np
-from kodoku_samples.kodoku.schemas import Config, Unit
-from kodoku_samples.simulator.objects import SimpleBattlefieldUnit
+from kodoku.schemas import Config, Unit
+from simulator.objects import SimpleBattlefieldUnit
 
 
 class SimpleBattlefieldSimulator:

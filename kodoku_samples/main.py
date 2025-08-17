@@ -4,13 +4,11 @@ import json
 import os
 import sys
 
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from kodoku.env import SimpleBattlefieldEnv
+from kodoku.trainer import KODOKUTrainer
+from kodoku.utils import LogCallbacksOldAPI as LogCallbacks
 
-from kodoku_samples.kodoku.env import SimpleBattlefieldEnv
-from kodoku_samples.kodoku.trainer import KODOKUTrainer
-from kodoku_samples.kodoku.utils import LogCallbacksOldAPI as LogCallbacks
-
-# from kodoku_sample.kodoku.utils import LogCallbacksNewAPI as LogCallbacks
+# from kodoku.utils import LogCallbacksNewAPI as LogCallbacks
 
 simulator_config = {
     "depth": 2.0,

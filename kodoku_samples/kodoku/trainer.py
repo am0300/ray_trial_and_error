@@ -15,8 +15,8 @@ from ray.rllib.utils.typing import ResultDict
 from ray.tune.logger import pretty_print
 from torch.utils.tensorboard import SummaryWriter
 
-from kodoku_samples.kodoku.env_wrapper import EnvWrapper
-from kodoku_samples.kodoku.policy import *
+from kodoku.env_wrapper import EnvWrapper
+from kodoku.policy import *
 
 
 class KODOKUTrainer:
