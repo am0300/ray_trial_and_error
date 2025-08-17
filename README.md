@@ -7,7 +7,7 @@
 - ray_examples
   - [Examples](https://docs.ray.io/en/latest/rllib/rllib-examples.html#examples)
 
-## Instration
+## Installation
 - build image and up container
   - `./docker_build.sh`
 - up container
