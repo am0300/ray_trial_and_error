@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     curl \
     vim \
+    x11-apps \
     && rm -rf /var/lib/apt/lists/*
 
 # home directoryの変更
@@ -25,5 +26,7 @@ RUN uv add opencv-python
 RUN uv add numba
 RUN uv add mypy
 RUN uv add ruff
+RUN uv add open_spiel
+RUN uv add pygame
 
 CMD [ "bash" ]
