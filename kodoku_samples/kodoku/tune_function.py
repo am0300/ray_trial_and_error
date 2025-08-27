@@ -109,8 +109,8 @@ def get_algorithm_config(
     # Initialize trainer
     algorithm_config = (
         config.api_stack(
-            enable_env_runner_and_connector_v2=False,
-            enable_rl_module_and_learner=False,
+            enable_env_runner_and_connector_v2=True,
+            enable_rl_module_and_learner=True,
         )
         .multi_agent(
             policies=policies,
@@ -178,14 +178,22 @@ def tune_function(
         run_config=tune.RunConfig(
             stop=stop2,
             verbose=2,
-            # callbacks=[LegacyLoggerCallback([callbacks])],
             progress_reporter=my_multi_agent_progress_reporter,
+            checkpoint_config=tune.CheckpointConfig(
+                checkpoint_frequency=2,
+                checkpoint_at_end=True,
+            ),
         ),
         tune_config=tune.TuneConfig(
             num_samples=1,  # hyper parameter探索で増やす
         ),
     ).fit()
     print(results)
+
+    trainer = algorithm_config.build_algo()
+
+    trainer.save_to_path("~/new_save_result")
+
     # print(pretty_print(results))
 
     # print_network_architecture(
